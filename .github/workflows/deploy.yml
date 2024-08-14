@@ -1,0 +1,78 @@
+name: Build and Deploy to ECR
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install yq
+        run: sudo apt-get install -y yq
+
+      - name: Determine environment configuration
+        id: env-config
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            config_file="variables/prod.yml"
+          elif [[ "${GITHUB_REF##*/}" == "dev" ]]; then
+            config_file="variables/dev.yml"
+          else
+            echo "Branch does not match any environment configuration."
+            exit 1
+          fi
+          
+          role_name=$(yq '.role_name' $config_file)
+          aws_region=$(yq '.aws_region' $config_file)
+          
+          echo "ROLE_NAME=$role_name" >> $GITHUB_ENV
+          echo "AWS_REGION=$aws_region" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::YOUR_ACCOUNT_ID:role/${{ env.ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Amazon ECR
+        run: aws ecr get-login-password | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      - name: Discover application folders
+        id: discover
+        run: |
+          echo "apps=$(ls -d */ | cut -f1 -d'/')" >> $GITHUB_ENV
+
+      - name: Process each application
+        run: |
+          for app in ${{ env.apps }}; do
+            echo "Processing $app"
+            config_file="$app/config.yml"
+            ecr_repo=$(yq '.ecr_repository' $config_file)
+            version=$(yq '.version' $config_file)
+            
+            # Create ECR repository if it doesn't exist
+            aws ecr describe-repositories --repository-names $ecr_repo || \
+            aws ecr create-repository --repository-name $ecr_repo
+            
+            # Build and push Docker image
+            docker build -t ${{ secrets.ECR_REGISTRY }}/$ecr_repo:$version $app
+            docker push ${{ secrets.ECR_REGISTRY }}/$ecr_repo:$version
+          done
+
+      - name: Post deployment notification
+        if: success()
+        run: echo "Deployed all applications to ECR"
