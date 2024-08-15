@@ -1,9 +1,10 @@
-name: Build and Deploy to ECR
+name: Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - dev
+  workflow_run:
+    workflows: ["Checkout and Configure Environment"]
+    types:
+      - completed
 
 jobs:
   build-and-push:
@@ -14,30 +15,6 @@ jobs:
       contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Determine environment configuration
-        id: env-config
-        run: |
-          branch_name="${GITHUB_REF##*/}"
-          if [[ "$branch_name" == "main" ]]; then
-            config_file="variables/prod.yml"
-          elif [[ "$branch_name" == "dev" ]]; then
-            config_file="variables/dev.yml"
-          else
-            echo "Branch does not match any environment configuration."
-            exit 1
-          fi
-          
-          role_name=$(yq '.role_name' $config_file)
-          aws_region=$(yq '.aws_region' $config_file)
-          apps=$(yq '.apps | join(" ")' $config_file)
-          
-          echo "ROLE_NAME=$role_name" >> $GITHUB_ENV
-          echo "AWS_REGION=$aws_region" >> $GITHUB_ENV
-          echo "APPS=$apps" >> $GITHUB_ENV
-
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v3
         with:
