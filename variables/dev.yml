@@ -3,3 +3,4 @@ aws_region: us-east-1
 apps:
   - testflask
   - testflask1
+  - flaskapp1
