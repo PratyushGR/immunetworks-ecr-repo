@@ -1,8 +1,5 @@
 role_name: arn:aws:iam::992382851941:role/PratyushGR-immunetworks-ecr-repo-dev-role
 aws_region: us-east-1
 apps:
-  - testflask
-  - testflask1
-  - flaskapp1
   - blog
   - blog-backend
