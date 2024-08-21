@@ -4,3 +4,5 @@ apps:
   - testflask
   - testflask1
   - flaskapp1
+  - blog
+  - blog-backend
