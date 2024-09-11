@@ -7,7 +7,7 @@ function App() {
     const newName = document.getElementById('name').value;
     setName(newName);
     try{
-      const response = await fetch(process.env.REACT_APP_BACKEND_URL+'/submit-name',{
+      const response = await fetch('http://127.0.0.1:3001/submit-name',{
         method:'POST',
         headers:{
           'Content-Type':'application/json'
